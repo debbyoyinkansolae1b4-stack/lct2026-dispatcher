@@ -1,0 +1,17 @@
+{
+  "_comment": "Официальная таблица нормативов организаторов (source/telegram/normatives-chat-2026-09-16.xlsx, чат 16.09 message431). Базовый норматив включает резерв на дорогу; при распределении резерв заменяется рассчитанной дорогой, превышение допустимо (чат 20.09 message544, 21.09 messages555-556). Поэтому время на адресе — техническая работа плюс документы, а дорога считается по матрице отдельно.",
+  "travel_reserve_minutes": 20,
+  "classes": {
+    "connect": {"title": "Подключение", "technical_minutes": 60, "documents_minutes": 10},
+    "emergency": {"title": "Авария на ТКД", "technical_minutes": 80, "documents_minutes": 0},
+    "addon": {"title": "Дозаказ оборудования", "technical_minutes": 10, "documents_minutes": 10},
+    "repair": {"title": "Локальная / ремонт", "technical_minutes": 30, "documents_minutes": 0}
+  },
+  "_class_by_bk_type_comment": "Четыре класса таблицы совпадают с полем «Тип заявки BK» выгрузки. Заявка неизвестного типа — ошибка загрузки, а не молчаливый ремонт. Срочная заявка (assumptions.requests.urgent_bk_types) всегда получает норматив аварии.",
+  "class_by_bk_type": {
+    "Подключение": "connect",
+    "Глобальная проблема": "emergency",
+    "Дозаказ": "addon",
+    "Локальная заявка": "repair"
+  }
+}

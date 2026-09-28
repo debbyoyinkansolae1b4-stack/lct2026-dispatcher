@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Движок поиска изнутри</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1d23; --muted:#5d6370; --rule:#e3e5ea; --hover:#f1f2f5;
+  --net:#ff0053; --net-tint:#fff0f4; --flow:#1b1d23; --flow-tint:#f6f7f9;
+  --sans:-apple-system,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --cond:var(--sans);
+  --mono:"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;margin:0;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.brand h1{font-family:var(--sans);font-weight:700;font-size:28px;letter-spacing:.01em;margin:0;line-height:1.1}
+.brand p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.controls{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.mode{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--panel)}
+.mode button{font:500 13px var(--sans);color:var(--muted);background:none;border:0;padding:7px 12px;cursor:pointer}
+.mode button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.mode button:focus-visible,.tree a:focus-visible,.kid:focus-visible,.crumbs a:focus-visible{outline:2px solid var(--flow);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:10px;border-radius:2px;border:1.5px solid;display:inline-block}
+.sw.l{border-color:var(--net);background:var(--net-tint)}
+.sw.f{border-color:var(--flow);background:var(--flow-tint)}
+.grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:28px;margin-top:20px}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}.tree{position:static!important;max-height:none!important}}
+.tree{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);align-self:start;max-height:calc(100vh - 40px);overflow:auto;font-size:13.5px}
+.tree h2{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.tree ul{list-style:none;margin:0;padding:0}
+.tree ul ul{padding-left:14px;border-left:1px solid var(--rule);margin-left:6px}
+.tree a{display:block;padding:3px 8px;border-radius:4px;color:var(--ink);text-decoration:none}
+.tree a:hover{background:var(--hover)}
+.tree a.on{background:var(--ink);color:var(--bg)}
+.tree a.lrn::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--net);margin-right:7px;vertical-align:1px}
+.tree a.on.lrn::before{background:var(--bg)}
+body.u .tree a.lrn{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--rule)}
+.crumbs{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px}
+.crumbs a{color:var(--flow);text-decoration:none}
+.crumbs a:hover{text-decoration:underline}
+article h2{font-family:var(--sans);font-weight:700;font-size:24px;margin:6px 0 6px;text-wrap:balance;line-height:1.15}
+.tag{display:inline-block;font:500 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-left:8px;vertical-align:4px}
+.tag.l{color:var(--net);background:var(--net-tint)}
+.tag.f{color:var(--flow);background:var(--flow-tint)}
+.lead{font-size:16px;max-width:72ch;margin:0 0 14px}
+.unote{display:none;border:1px dashed var(--net);background:var(--net-tint);border-radius:6px;padding:10px 14px;margin:0 0 16px;max-width:80ch;font-size:14px}
+body.u .unote{display:block}
+figure{margin:8px 0 22px;background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:14px}
+figure .scroll{overflow-x:auto}
+figure svg{display:block;width:100%;height:auto;min-width:620px;color:var(--ink)}
+figcaption{font-size:13px;color:var(--muted);margin-top:10px;max-width:90ch}
+svg .bx{fill:var(--panel);stroke:var(--rule);stroke-width:1.2}
+svg .bx.f{fill:var(--flow-tint);stroke:var(--flow)}
+svg .bx.l{fill:var(--net-tint);stroke:var(--net)}
+svg .tt{fill:var(--ink);font:600 13px var(--sans)}
+svg .ts{fill:var(--muted);font:400 11px var(--sans)}
+svg .tm{fill:var(--muted);font:400 11px var(--mono)}
+svg .al{fill:var(--muted);font:italic 400 11px var(--sans)}
+svg .ar{stroke:var(--ink);stroke-width:1.3;fill:none}
+svg .ar.n{stroke:var(--net);stroke-dasharray:5 3}
+svg .mk{fill:var(--ink)} svg .mk.n{fill:var(--net)}
+svg .go{cursor:pointer}
+svg .go:hover .bx,svg .go:focus .bx{stroke-width:2.4}
+svg .go:focus{outline:none}
+svg .dot{fill:var(--ink)}
+body.u svg .lrn{opacity:.22}
+.kids{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:4px 0 26px}
+.kid{display:block;text-align:left;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:11px 13px;cursor:pointer}
+.kid:hover{background:var(--hover)}
+.kid b{display:block;font-weight:600;font-size:14.5px}
+.kid span{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.kid.lrn{border-left:3px solid var(--net)}
+body.u .kid.lrn{opacity:.55}
+h3{font:600 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:24px 0 8px}
+.tbl{overflow-x:auto;margin:0 0 8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--rule)}
+th{font-weight:600;color:var(--muted);font-size:12.5px}
+td.n,th.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+code,.m{font-family:var(--mono);font-size:12.5px}
+.k{color:var(--net);font-weight:600}
+.body p,.body li{max-width:80ch}
+.body ul{padding-left:20px}
+.note{border-left:3px solid var(--flow);padding:6px 12px;margin:10px 0;background:var(--panel);border-radius:0 6px 6px 0;max-width:80ch}
+.note.w{border-left-color:var(--net)}
+.foot{margin-top:36px;padding-top:12px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.kid,.tree a{transition:background .12s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Помощник диспетчера · интерактивная схема к документации</div>
+      <h1>Движок поиска изнутри</h1>
+      <p>Как эволюционный поиск и графовая нейросеть, обучаемая с подкреплением, вместе строят план. Каждый блок раскрывается до деталей — щёлкните по нему на схеме или в дереве.</p>
+    </div>
+    <div class="controls">
+      <div class="mode" role="group" aria-label="Что показывать">
+        <button id="m-b" type="button" aria-pressed="true">Режим «сеть»</button>
+        <button id="m-u" type="button" aria-pressed="false">Режим «равномерный»</button>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw l"></i>учится (веса сети)</span>
+        <span><i class="sw f"></i>движок поиска (код, правила)</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <nav class="tree" aria-label="Все блоки">
+      <h2>Все блоки</h2>
+      <ul id="tree"></ul>
+    </nav>
+    <article id="view" aria-live="polite"></article>
+  </div>
+
+  <p class="foot">Соответствует версии приложения, описанной в документации. Код: цикл поиска — <code>src/search/population.py</code>, ходы — <code>src/search/actions.py</code> и <code>operators.py</code>, сеть и обучение — <code>src/search/policy/gnn/</code>. Размеры сверены на графе Юго-востока: 83 заявки, 12 маршрутов. Команда «Эксперимент» · ЛЦТ2026.</p>
+</div>
+
+<script>
+const A = (id, cls='') => `<defs><marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk ${cls}"/></marker></defs>`;
+const box = (x, y, w, h, cls, title, sub, go, lrn) =>
+  `<g class="${go ? 'go' : ''} ${lrn ? 'lrn' : ''}" ${go ? `data-go="${go}" tabindex="0" role="link" aria-label="${title}"` : ''}>
+     <rect class="bx ${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
+     <text class="tt" x="${x + w / 2}" y="${y + (sub ? h / 2 - 3 : h / 2 + 4)}" text-anchor="middle">${title}</text>
+     ${sub ? `<text class="ts" x="${x + w / 2}" y="${y + h / 2 + 13}" text-anchor="middle">${sub}</text>` : ''}
+   </g>`;
+
+const FIG = {
+epoch: `<svg viewBox="0 0 1000 320" role="img" aria-label="Цикл одной эпохи: родитель, граф, сеть, выбор 64 ходов, ход, кандидаты; из кандидатов — отбор нового родителя и шаг обучения с подкреплением">
+ ${A('ae')}${A('aen','n')}${A('aet','t')}
+ ${box(20,40,120,56,'f','План-родитель','текущий','select')}
+ ${box(188,40,120,56,'f','Граф плана','узлы и связи','graph')}
+ ${box(356,40,120,56,'l','Сеть','10.3 млн весов','net',1)}
+ ${box(524,40,120,56,'l','Выбор хода','× 64','pick',1)}
+ ${box(692,40,120,56,'f','Ход','снять и вставить','move')}
+ ${box(860,40,120,56,'f','Кандидаты','64 плана','select')}
+ <line class="ar" x1="140" y1="68" x2="186" y2="68" marker-end="url(#ae)"/><text class="al" x="163" y="60" text-anchor="middle">план</text>
+ <line class="ar" x1="308" y1="68" x2="354" y2="68" marker-end="url(#ae)"/><text class="al" x="331" y="60" text-anchor="middle">граф</text>
+ <line class="ar" x1="476" y1="68" x2="522" y2="68" marker-end="url(#ae)"/><text class="al" x="499" y="60" text-anchor="middle">логиты</text>
+ <line class="ar" x1="644" y1="68" x2="690" y2="68" marker-end="url(#ae)"/><text class="al" x="667" y="60" text-anchor="middle">ходы</text>
+ <line class="ar" x1="812" y1="68" x2="858" y2="68" marker-end="url(#ae)"/><text class="al" x="835" y="60" text-anchor="middle">планы</text>
+ ${box(524,150,120,56,'l','Обучение RL','1 шаг на эпоху','learn',1)}
+ ${box(860,240,120,56,'f','Отбор','по кортежу цели','select')}
+ <polyline class="ar" points="890,96 890,178 646,178" marker-end="url(#ae)"/><text class="al" x="768" y="172" text-anchor="middle">награды</text>
+ <polyline class="ar n lrn" points="524,170 416,170 416,98" marker-end="url(#aen)"/><text class="al lrn" x="470" y="164" text-anchor="middle">шаг весов</text>
+ <line class="ar" x1="930" y1="96" x2="930" y2="238" marker-end="url(#ae)"/><text class="al" x="938" y="224">кортежи</text>
+ <polyline class="ar" points="860,268 80,268 80,98" marker-end="url(#ae)"/><text class="al" x="470" y="262" text-anchor="middle">новый родитель (или прежний) · лучший план — отдельно, как рекорд</text>
+</svg>`,
+
+graph: `<svg viewBox="0 0 900 330" role="img" aria-label="Граф плана: бригады, маршруты и заявки, девять типов связей между ними">
+ ${A('ag')}
+ ${box(40,60,190,64,'f','Бригада','14 признаков','graph-nodes')}
+ ${box(670,60,190,64,'f','Маршрут','34 признака','graph-nodes')}
+ ${box(355,230,190,64,'f','Заявка','25 признаков','graph-nodes')}
+ <line class="ar" x1="232" y1="84" x2="668" y2="84" marker-end="url(#ag)" marker-start="url(#ag)"/>
+ <text class="al" x="450" y="76" text-anchor="middle">owns / owner · бригада ↔ её маршрут, 1 : 1</text>
+ <line class="ar" x1="700" y1="126" x2="515" y2="228" marker-end="url(#ag)" marker-start="url(#ag)"/>
+ <text class="al" x="660" y="190" text-anchor="start">assigned / contains</text>
+ <text class="al" x="660" y="204" text-anchor="start">заявка ↔ маршрут, где стоит</text>
+ <line class="ar" x1="200" y1="126" x2="385" y2="228" marker-end="url(#ag)" marker-start="url(#ag)"/>
+ <text class="al" x="30" y="178">eligible / can_serve</text>
+ <text class="al" x="30" y="192">4 самые дешёвые бригады на заявку;</text>
+ <text class="al" x="30" y="206">на ребре — цена вставки и позиция</text>
+ <path class="ar" d="M545,262 C620,262 620,318 520,300" marker-end="url(#ag)"/>
+ <text class="al" x="628" y="282">near — 4 ближайшие заявки</text>
+ <text class="al" x="628" y="296">next / previous — соседи в маршруте</text>
+ <text class="tm" x="355" y="318">+ вектор общего состояния: 10 чисел</text>
+</svg>`,
+
+net: `<svg viewBox="0 0 1000 360" role="img" aria-label="Путь данных в сети: признаки узлов, проекция в 256, два слоя обмена сообщениями, свёртка в состояние 778, три эксперта с двумя гейтами, головы выбора и ценности">
+ ${A('an')}
+ ${box(14,30,112,40,'f','Бригады','14','graph-nodes')}
+ ${box(14,80,112,40,'f','Маршруты','34','graph-nodes')}
+ ${box(14,130,112,40,'f','Заявки','25','graph-nodes')}
+ ${box(14,230,112,40,'f','Общее','10','graph-nodes')}
+ <g class="lrn">
+ ${box(160,30,118,140,'l','Проекция','→ 256 каждому','net-in')}
+ ${box(312,30,130,140,'l','Обмен ×2','GATv2, 9 связей','net-mp')}
+ ${box(476,30,118,140,'l','Свёртка','среднее → 778','net-pool')}
+ ${box(628,30,130,140,'l','3 эксперта','+ 2 гейта','net-moe')}
+ ${box(800,20,186,60,'l','Головы хода','оператор · масштаб …','net-heads')}
+ ${box(800,96,186,60,'l','Головы цели','маршрут · заявка · бригада','net-heads')}
+ ${box(800,172,186,50,'l','Ценность V','одно число','net-heads')}
+ ${box(800,238,186,50,'l','Декодер звеньев','цепочка','net-links')}
+ </g>
+ <line class="ar" x1="126" y1="50" x2="158" y2="50" marker-end="url(#an)"/>
+ <line class="ar" x1="126" y1="100" x2="158" y2="100" marker-end="url(#an)"/>
+ <line class="ar" x1="126" y1="150" x2="158" y2="150" marker-end="url(#an)"/>
+ <line class="ar" x1="278" y1="100" x2="310" y2="100" marker-end="url(#an)"/>
+ <line class="ar" x1="442" y1="100" x2="474" y2="100" marker-end="url(#an)"/>
+ <polyline class="ar" points="126,250 535,250 535,172" marker-end="url(#an)"/><text class="al" x="330" y="244" text-anchor="middle">общее — прямо в состояние</text>
+ <line class="ar" x1="594" y1="100" x2="626" y2="100" marker-end="url(#an)"/>
+ <polyline class="ar" points="758,70 780,70 780,50 798,50" marker-end="url(#an)"/><text class="al" x="768" y="40" text-anchor="middle">act</text>
+ <polyline class="ar" points="758,150 780,150 780,197 798,197" marker-end="url(#an)"/><text class="al" x="770" y="212" text-anchor="end">val</text>
+ <polyline class="ar" points="377,172 377,318 770,318 770,126 798,126" marker-end="url(#an)"/>
+ <text class="al" x="575" y="312" text-anchor="middle">векторы узлов после обмена — в головы цели и в декодер</text>
+ <line class="ar" x1="770" y1="263" x2="798" y2="263" marker-end="url(#an)"/>
+ <line class="ar" x1="780" y1="70" x2="780" y2="126"/>
+</svg>`,
+
+'net-mp': `<svg viewBox="0 0 900 290" role="img" aria-label="Два шага обмена сообщениями: маршрут собирает от своих заявок сведения о бригадах, куда их можно отдать">
+ ${A('am')}
+ <text class="ts" x="20" y="24">Что маршрут может узнать за 2 шага</text>
+ ${box(20,50,160,54,'f','Бригада B','есть место?')}
+ ${box(360,50,180,54,'f','Заявка q','стоит в маршруте R')}
+ ${box(700,50,180,54,'f','Маршрут R','чей это роспуск')}
+ <line class="ar" x1="180" y1="77" x2="358" y2="77" marker-end="url(#am)"/>
+ <text class="al" x="269" y="69" text-anchor="middle">шаг 1 · can_serve</text>
+ <text class="al" x="269" y="95" text-anchor="middle">цена вставки на ребре</text>
+ <line class="ar" x1="540" y1="77" x2="698" y2="77" marker-end="url(#am)"/>
+ <text class="al" x="619" y="69" text-anchor="middle">шаг 2 · contains</text>
+ <text class="al" x="619" y="95" text-anchor="middle">всё, что q узнала</text>
+ <g class="lrn">
+ ${box(20,160,860,100,'l','','')}
+ </g>
+ <text class="tt" x="40" y="188">Один слой</text>
+ <text class="ts" x="40" y="208">на каждую из 9 связей свой GATv2: 4 головы внимания, усреднение, 4 признака ребра</text>
+ <text class="ts" x="40" y="226">сообщения всех связей в узел суммируются → x + сообщение → LayerNorm → ReLU (остаточная связь)</text>
+ <text class="ts" x="40" y="244">внимание — взвешенное среднее соседей: «сколько всего» и «сумма по заявкам» выучиваются плохо</text>
+</svg>`,
+
+'net-moe': `<svg viewBox="0 0 900 250" role="img" aria-label="Состояние 778 идёт в три эксперта; гейт действия и гейт ценности смешивают их выходы в два вектора">
+ ${A('ax')}
+ <g class="lrn">
+ ${box(20,95,130,56,'f','Состояние','778 чисел')}
+ ${box(250,20,150,44,'l','Эксперт 1','778 → 256, SiLU')}
+ ${box(250,100,150,44,'l','Эксперт 2','778 → 256, SiLU')}
+ ${box(250,180,150,44,'l','Эксперт 3','778 → 256, SiLU')}
+ ${box(500,40,170,56,'l','Гейт действия','softmax по 3')}
+ ${box(500,150,170,56,'l','Гейт ценности','softmax по 3')}
+ ${box(760,40,120,56,'l','act','256 → головы хода')}
+ ${box(760,150,120,56,'l','val','256 → V')}
+ </g>
+ <line class="ar" x1="150" y1="115" x2="248" y2="42" marker-end="url(#ax)"/>
+ <line class="ar" x1="150" y1="123" x2="248" y2="122" marker-end="url(#ax)"/>
+ <line class="ar" x1="150" y1="131" x2="248" y2="202" marker-end="url(#ax)"/>
+ <line class="ar" x1="400" y1="122" x2="498" y2="68" marker-end="url(#ax)"/>
+ <line class="ar" x1="400" y1="122" x2="498" y2="178" marker-end="url(#ax)"/>
+ <line class="ar" x1="670" y1="68" x2="758" y2="68" marker-end="url(#ax)"/>
+ <line class="ar" x1="670" y1="178" x2="758" y2="178" marker-end="url(#ax)"/>
+ <text class="al" x="714" y="200" text-anchor="middle">×0.1 к градиенту</text>
+</svg>`,
+
+'net-heads': `<svg viewBox="0 0 900 300" role="img" aria-label="Головы: из act — оператор, масштаб, вставка, длина цепочки; из векторов узлов плюс act — матрицы узлы на операторы для выбора цели; из val — ценность">
+ ${A('ah')}
+ <g class="lrn">
+ ${box(20,40,110,50,'l','act','256')}
+ ${box(20,150,110,50,'l','узлы + act','N × 256')}
+ ${box(20,240,110,44,'l','val','256')}
+ ${box(210,10,150,34,'l','оператор','6')}
+ ${box(210,52,150,34,'l','масштаб','3')}
+ ${box(380,10,150,34,'l','вставка','6')}
+ ${box(380,52,150,34,'l','длина цепочки','4 (маска до 3)')}
+ ${box(210,120,150,42,'l','маршрут','12 × 6')}
+ ${box(380,120,150,42,'l','заявка','83 × 6')}
+ ${box(550,120,150,42,'l','бригада','12 × 6')}
+ ${box(210,242,150,40,'l','ценность V','1 число')}
+ </g>
+ <polyline class="ar" points="130,65 180,65 180,27 208,27" marker-end="url(#ah)"/>
+ <line class="ar" x1="180" y1="69" x2="208" y2="69" marker-end="url(#ah)"/>
+ <line class="ar" x1="130" y1="175" x2="208" y2="141" marker-end="url(#ah)"/>
+ <line class="ar" x1="130" y1="262" x2="208" y2="262" marker-end="url(#ah)"/>
+ <text class="ts" x="210" y="196">каждая голова цели даёт матрицу «узлы × 6 операторов»;</text>
+ <text class="ts" x="210" y="212">выбор идёт по столбцу оператора, который уже выбран</text>
+ <text class="al" x="730" y="146">пример: Юго-восток,</text>
+ <text class="al" x="730" y="160">83 заявки, 12 маршрутов</text>
+</svg>`,
+
+pick: `<svg viewBox="0 0 960 250" role="img" aria-label="Порядок выбора в одном ходе: оператор, вставка, масштаб, цель в зависимости от оператора, длина цепочки, звенья">
+ ${A('ap')}
+ <g class="lrn">
+ ${box(20,90,120,56,'l','Оператор','1 из 6','move-ops')}
+ ${box(176,90,120,56,'l','Вставка','1 из 6','move-repair')}
+ ${box(332,90,120,56,'l','Масштаб','кроме переноса','move-ops')}
+ ${box(488,20,200,40,'l','маршрут → заявка-якорь','отрезок')}
+ ${box(488,68,200,40,'l','маршрут → 2-я бригада','пара')}
+ ${box(488,116,200,40,'l','маршрут','роспуск')}
+ ${box(488,164,200,40,'l','заявка-якорь','место / время')}
+ ${box(488,212,200,34,'l','заявка → получатель','перенос')}
+ ${box(730,90,100,56,'l','Длина','1–3','move-chain')}
+ ${box(860,90,90,56,'l','Звенья','декодер','net-links')}
+ </g>
+ <line class="ar" x1="140" y1="118" x2="174" y2="118" marker-end="url(#ap)"/>
+ <line class="ar" x1="296" y1="118" x2="330" y2="118" marker-end="url(#ap)"/>
+ <line class="ar" x1="452" y1="118" x2="486" y2="40" marker-end="url(#ap)"/>
+ <line class="ar" x1="452" y1="118" x2="486" y2="88" marker-end="url(#ap)"/>
+ <line class="ar" x1="452" y1="118" x2="486" y2="136" marker-end="url(#ap)"/>
+ <line class="ar" x1="452" y1="118" x2="486" y2="184" marker-end="url(#ap)"/>
+ <line class="ar" x1="452" y1="118" x2="486" y2="229" marker-end="url(#ap)"/>
+ <line class="ar" x1="688" y1="118" x2="728" y2="118" marker-end="url(#ap)"/>
+ <line class="ar" x1="830" y1="118" x2="858" y2="118" marker-end="url(#ap)"/>
+ <text class="al" x="20" y="182">каждый выбор:</text>
+ <text class="al" x="20" y="198">0.8 · сеть + 0.2 · равномерно</text>
+ <text class="al" x="20" y="214">по допустимым вариантам</text>
+</svg>`,
+
+select: `<svg viewBox="0 0 900 250" role="img" aria-label="Отбор: из изменённых кандидатов берётся лучший; не хуже родителя — принят; хуже в строках 1–5 — отказ; хуже только в км или ожидании — принят с вероятностью">
+ ${A('as')}
+ ${box(20,90,150,60,'f','64 кандидата','кортежи цели')}
+ ${box(220,90,170,60,'f','Лучший изменённый','копии родителя не в счёт')}
+ ${box(470,10,200,50,'f','не хуже родителя','принят')}
+ ${box(470,98,200,50,'f','хуже в строках 1–5','отказ всегда')}
+ ${box(470,186,200,50,'f','хуже в км / ожидании','принят с вероятностью p')}
+ ${box(740,90,140,60,'f','Рекорд','лучший за расчёт')}
+ <line class="ar" x1="170" y1="120" x2="218" y2="120" marker-end="url(#as)"/>
+ <line class="ar" x1="390" y1="120" x2="468" y2="35" marker-end="url(#as)"/>
+ <line class="ar" x1="390" y1="120" x2="468" y2="123" marker-end="url(#as)"/>
+ <line class="ar" x1="390" y1="120" x2="468" y2="211" marker-end="url(#as)"/>
+ <polyline class="ar" points="95,150 95,236 440,236" />
+ <line class="ar" x1="440" y1="236" x2="738" y2="136" marker-end="url(#as)"/>
+ <text class="al" x="240" y="230" text-anchor="middle">лучший из всех 64 — в рекорд, если лучше</text>
+ <text class="tm" x="690" y="224">p = exp(−Δ/разброс/τ)</text>
+</svg>`,
+
+learn: `<svg viewBox="0 0 960 270" role="img" aria-label="Обучение: награды кандидатов нормируются внутри эпохи в преимущество; из него и вероятностей ходов складываются потери; шаг Adam обновляет веса">
+ ${A('al')}${A('aln','n')}
+ ${box(20,100,130,56,'f','Награды','ступеньки, 64','learn-reward')}
+ ${box(190,100,140,56,'f','Преимущество','норма в эпохе','learn-adv')}
+ <g class="lrn">
+ ${box(380,10,190,44,'l','Актор','−w · log π(ход) · A','learn-loss')}
+ ${box(380,64,190,44,'l','Энтропия','α держит ≥ 0.75','learn-loss')}
+ ${box(380,118,190,44,'l','Цели голов','по исходам эпохи','learn-loss')}
+ ${box(380,172,190,44,'l','Критик','учится попутно','learn-loss')}
+ ${box(620,90,140,70,'l','Шаг','обрезка + Adam','learn-step')}
+ ${box(800,90,140,70,'l','Веса сети','→ следующая эпоха','net')}
+ </g>
+ <line class="ar" x1="150" y1="128" x2="188" y2="128" marker-end="url(#al)"/>
+ <line class="ar" x1="330" y1="128" x2="378" y2="32" marker-end="url(#al)"/>
+ <line class="ar" x1="330" y1="128" x2="378" y2="140" marker-end="url(#al)"/>
+ <line class="ar" x1="570" y1="32" x2="618" y2="112" marker-end="url(#al)"/>
+ <line class="ar" x1="570" y1="86" x2="618" y2="118" marker-end="url(#al)"/>
+ <line class="ar" x1="570" y1="140" x2="618" y2="128" marker-end="url(#al)"/>
+ <line class="ar" x1="570" y1="194" x2="618" y2="138" marker-end="url(#al)"/>
+ <line class="ar n lrn" x1="760" y1="125" x2="798" y2="125" marker-end="url(#aln)"/>
+ <text class="al" x="190" y="186">w — вес хода в пачке:</text>
+ <text class="al" x="190" y="200">одинаковые ходы делят массу</text>
+</svg>`
+};
+
+const N = {
+epoch:{t:'Эпоха поиска',tag:'f',s:'Эпоха — один цикл эволюционного поиска. Сеть живёт внутри него как политика обучения с подкреплением: смотрит на текущий план, предлагает 64 хода (мутации), видит, что из них вышло, и сразу делает шаг обучения. Учится с нуля под каждую задачу — заранее ничего не выучено.',
+ u:'Режим «равномерный»: та же эпоха, тот же граф (нужен для масок), те же 64 кандидата, тот же отбор. Нет сети и нет шага обучения — ходы выбираются равномерно по тем же маскам, а место изменения — наполовину пропорционально потенциалу.',
+ kids:['graph','net','pick','move','select','learn','limits'],
+ b:`<h3>Цифры</h3><div class="tbl"><table>
+ <tr><th>Что</th><th class="n">Значение</th><th>Комментарий</th></tr>
+ <tr><td>Кандидатов за эпоху</td><td class="n">64</td><td>все от одного родителя</td></tr>
+ <tr><td>Весов в сети</td><td class="n">≈ 10.3 млн</td><td>основная масса — 18 блоков GATv2 (9 связей × 2 слоя)</td></tr>
+ <tr><td>Шагов обучения</td><td class="n">1 на эпоху</td><td>Adam, lr 0.001</td></tr>
+ <tr><td>Время эпохи</td><td class="n">≈ 0.2 с</td><td>на участке: около 100 эпох за 20 с расчёта</td></tr>
+ </table></div>
+ <div class="note">Схема читается слева направо по верхнему ряду и возвращается по нижнему. Красное учится (веса сети), чёрное — код и правила движка. Эволюционная часть — ходы, отбор, рекорд; обучение с подкреплением — выбор хода и шаг весов по наградам.</div>`},
+
+graph:{t:'Граф плана',tag:'f',p:'epoch',s:'План-родитель переводится в граф: три типа узлов, девять типов связей и вектор общего состояния. Признаки нормируются по самой задаче.',
+ u:'Режим «равномерный» строит тот же граф: из него берутся маски допустимых ходов и потенциал для выбора места изменения.',
+ kids:['graph-nodes','graph-edges','graph-norm'],
+ b:`<h3>Зачем граф, а не таблица</h3><p>Размер задачи меняется (12 маршрутов на участке, 40 на 300×40), а связи между заявками, маршрутами и бригадами и есть то, что решает, куда бить. Графовая сеть работает с любым числом узлов и передаёт сведения по этим связям.</p>`},
+
+'graph-nodes':{t:'Узлы и признаки',tag:'f',p:'graph',s:'Что сеть знает о каждой заявке, маршруте и бригаде. Признаки цели и потенциала — её «зрение».',
+ b:`<h3>Заявка — 25 признаков</h3><div class="tbl"><table>
+ <tr><th>Группа</th><th class="n">Число</th><th>Признаки</th></tr>
+ <tr><td>Сама заявка</td><td class="n">14</td><td>тип работ (3), приоритет, длительность, час начала окна, ширина окна, смещение от офиса (2), оборудование (4), нужен ли транспорт</td></tr>
+ <tr><td>Место в плане</td><td class="n">5</td><td>назначена ли, позиция в маршруте, запас от начала окна до прихода, запас до конца окна, км до неё</td></tr>
+ <tr><td><span class="k">Цель</span></td><td class="n">4</td><td>ожидание аварии (мин), флаг «&gt; 2 ч», запас до 2 ч, крюк (км)</td></tr>
+ <tr><td><span class="k">Потенциал</span></td><td class="n">2</td><td>выигрыш переноса к другой бригаде (крюк минус лучшая вставка, км), флаг «перенос выгоден»</td></tr>
+ </table></div>
+ <h3>Маршрут — 34 признака</h3><div class="tbl"><table>
+ <tr><th>Группа</th><th class="n">Число</th><th>Признаки</th></tr>
+ <tr><td>Загрузка и бригада</td><td class="n">23</td><td>число заявок, км, доля смены на дорогу, доля смены на работу, задействован ли, навыки (3), транспорт (4), доступна ли, заявок приоритета 2 и 1, оборудование в наличии (4) и остаток (4)</td></tr>
+ <tr><td>Время и место</td><td class="n">8</td><td>минимальный и средний запас окон, запас смены, ожидание, центр (2), разброс, самый длинный перегон</td></tr>
+ <tr><td><span class="k">Цель</span></td><td class="n">1</td><td>аварий сверх 2 ч в маршруте</td></tr>
+ <tr><td><span class="k">Потенциал</span></td><td class="n">1</td><td>сумма выгодных переносов из маршрута</td></tr>
+ <tr><td>Переселение</td><td class="n">1</td><td>доля заявок, которые можно отдать другой бригаде</td></tr>
+ </table></div>
+ <h3>Бригада — 14, общее состояние — 10</h3><div class="tbl"><table>
+ <tr><th>Узел</th><th class="n">Число</th><th>Признаки</th></tr>
+ <tr><td>Бригада</td><td class="n">14</td><td>навыки (3), транспорт (4), доступна ли, час начала смены, длина смены, оборудование (4)</td></tr>
+ <tr><td>Общее</td><td class="n">10</td><td>доля неназначенных, доля задействованных бригад, км плана, пройденная доля поиска, эпох без рекорда, доля почти пустых маршрутов, неназначенных приоритетов 2 и 1, <span class="k">аварий сверх 2 ч</span>, <span class="k">число выгодных переносов</span></td></tr>
+ </table></div>
+ <div class="note w">Потенциал дан сети готовым числом, хотя цены вставки и так лежат на рёбрах. Причина — замер: без этого признака сеть сама его не собирала, а с ним стала значимо лучше на участках (23 выигрыша, 7 проигрышей).</div>`},
+
+'graph-edges':{t:'Связи',tag:'f',p:'graph',s:'Девять типов направленных связей. По ним на каждом слое идут сообщения. У каждой связи 4 признака ребра.',
+ b:`<div class="tbl"><table>
+ <tr><th>Связь</th><th>Откуда → куда</th><th>Смысл</th><th>Признаки ребра</th></tr>
+ <tr><td><code>owns</code> / <code>owner</code></td><td>бригада ↔ маршрут</td><td>бригада и её маршрут, 1 : 1</td><td>единицы</td></tr>
+ <tr><td><code>assigned</code> / <code>contains</code></td><td>заявка ↔ маршрут</td><td>где заявка стоит сейчас</td><td>единицы</td></tr>
+ <tr><td><code>eligible</code> / <code>can_serve</code></td><td>заявка ↔ бригада</td><td>4 самые дешёвые допустимые бригады для заявки</td><td>[1, цена вставки км / 100, относительная позиция вставки, 1]</td></tr>
+ <tr><td><code>next</code> / <code>previous</code></td><td>заявка → заявка</td><td>соседи по порядку в маршруте</td><td>[км / 100, пауза в часах, 0, 1]</td></tr>
+ <tr><td><code>near</code></td><td>заявка → заявка</td><td>4 ближайшие по расстоянию</td><td>[расстояние / 100, 0, 0, 1]</td></tr>
+ </table></div>
+ <div class="note">Прореживание до 4 бригад на заявку сокращает сообщения, но не убирает ни одного хода: полная маска переноса хранится отдельно.</div>`},
+
+'graph-norm':{t:'Нормировка входа',tag:'f',p:'graph',s:'Каждый признак приводится к среднему 0 и разбросу 1 по статистике, накопленной за этот же расчёт.',
+ b:`<ul><li>Статистика копится по графам расчёта (метод Уэлфорда), отдельно для каждой колонки каждой группы: бригады, маршруты, заявки, общее.</li>
+ <li>Значения обрезаются, колонки без разброса не делятся.</li>
+ <li>Сам граф не меняется: маски и подсказки видят сырые значения, сеть — нормированные.</li></ul>
+ <div class="note">Нормировка «по задаче» заменила прежние заранее подобранные делители: веса сети учатся на входе одного масштаба на любом участке.</div>`},
+
+net:{t:'Сеть',tag:'l',p:'epoch',lrn:1,s:'Графовая сеть ≈ 10.3 млн весов. Признаки проецируются в 256 чисел, проходят 2 слоя обмена сообщениями по 9 связям, сворачиваются в вектор состояния 778, дальше 3 эксперта с двумя гейтами — и головы выбора и ценности.',
+ u:'В режиме «равномерный» сети нет: ни весов, ни прямого прохода. Всё, что на этой схеме, не создаётся.',
+ kids:['net-in','net-mp','net-pool','net-moe','net-heads','net-links','net-reg'],
+ b:`<h3>Что важно помнить</h3><ul>
+ <li>Головы инициализированы нулями — на старте выбор ровно равномерный, сеть отходит от него по мере обучения.</li>
+ <li>Векторы узлов после обмена идут в головы цели напрямую: «куда бить» выбирается по вектору конкретного маршрута или заявки, а не по общему состоянию.</li>
+ <li>Один прямой проход на эпоху: все 64 хода и все звенья цепочек берутся из него.</li></ul>`},
+
+'net-in':{t:'Проекция признаков',tag:'l',p:'net',lrn:1,s:'Каждый тип узла — свой линейный слой в 256 чисел.',
+ b:`<div class="tbl"><table><tr><th>Узел</th><th class="n">Вход</th><th class="n">Выход</th></tr>
+ <tr><td>Бригада</td><td class="n">14</td><td class="n">256</td></tr><tr><td>Маршрут</td><td class="n">34</td><td class="n">256</td></tr><tr><td>Заявка</td><td class="n">25</td><td class="n">256</td></tr></table></div>
+ <p>Гейты признаков (умножение каждого признака на обучаемое число) в коде есть, в текущей версии выключены.</p>`},
+
+'net-mp':{t:'Обмен сообщениями ×2',tag:'l',p:'net',lrn:1,s:'Два слоя. На каждом каждый узел получает сообщения от соседей по всем 9 связям и обновляется. За два шага маршрут видит своих заявок и, через них, бригады, куда их можно отдать.',
+ b:`<ul><li>На каждую связь — свой GATv2: 4 головы внимания, их выходы усредняются, признаки ребра учитываются.</li>
+ <li>Сообщения всех связей, пришедшие в узел, суммируются; затем <code>x + сообщение → LayerNorm → ReLU</code>.</li>
+ <li>Всего 18 блоков GATv2 (9 × 2) — большая часть весов сети.</li></ul>
+ <div class="note w">Узкое место: внимание — взвешенное среднее соседей. Сумма по заявкам маршрута («сколько стоит раздать все»), число выгодных переносов и совместная вместимость соседей (3 шага) выучиваются плохо. Поэтому потенциал подан готовым признаком.</div>`},
+
+'net-pool':{t:'Свёртка в состояние',tag:'l',p:'net',lrn:1,s:'Векторы всех бригад, маршрутов и заявок усредняются по типу, к ним приписывается общее состояние.',
+ b:`<p class="m">среднее(бригады) 256 + среднее(маршруты) 256 + среднее(заявки) 256 + общее 10 = 778</p>
+ <div class="note w">Только среднее: два плана с одинаковой средней загрузкой, где в одном все маршруты ровные, а в другом один перегружен, для головы оператора неотличимы. Вариант «среднее + разброс + максимум» в коде есть, в текущей версии выключен.</div>`},
+
+'net-moe':{t:'Эксперты и гейты',tag:'l',p:'net',lrn:1,s:'Три эксперта — три взгляда на состояние. Два гейта смешивают их по-разному: один для выбора хода, другой для ценности.',
+ b:`<ul><li>Эксперт: <code>778 → 256</code>, SiLU.</li>
+ <li><b>act</b> = Σ гейт_действия · эксперт — вход голов хода и добавка к векторам узлов в головах цели.</li>
+ <li><b>val</b> = Σ гейт_ценности · эксперт — вход головы ценности.</li>
+ <li>Градиент критика в экспертов ослаблен в 10 раз (<code>critic_scale = 0.1</code>): ценность не перетягивает общие слои на себя.</li></ul>`},
+
+'net-heads':{t:'Головы',tag:'l',p:'net',lrn:1,s:'Выходы, из которых собирается ход, и одно число ценности.',
+ b:`<div class="tbl"><table><tr><th>Голова</th><th>Вход</th><th class="n">Выход</th><th>Что выбирает</th></tr>
+ <tr><td>оператор</td><td>act</td><td class="n">6</td><td>вид разрушения</td></tr>
+ <tr><td>масштаб</td><td>act</td><td class="n">3</td><td>0.15 / 0.4 / 0.8</td></tr>
+ <tr><td>вставка</td><td>act</td><td class="n">6</td><td>regret-1/2/3 × плотная / свободная</td></tr>
+ <tr><td>длина цепочки</td><td>act</td><td class="n">4</td><td>1–4, маска до 3</td></tr>
+ <tr><td>маршрут</td><td>вектор маршрута + act</td><td class="n">маршруты × 6</td><td>какой маршрут — столбец выбранного оператора</td></tr>
+ <tr><td>заявка</td><td>вектор заявки + act</td><td class="n">заявки × 6</td><td>заявка-якорь</td></tr>
+ <tr><td>бригада</td><td>вектор бригады + act</td><td class="n">бригады × 6</td><td>вторая бригада / получатель</td></tr>
+ <tr><td>ценность V</td><td>val</td><td class="n">1</td><td>оценка состояния; обучается попутно, в выборе хода сейчас не участвует</td></tr></table></div>`},
+
+'net-links':{t:'Декодер звеньев',tag:'l',p:'net',lrn:1,s:'Цепочка из 2–3 разрушений собирается из того же прохода, но каждое следующее звено видит, что выбрало предыдущее.',
+ b:`<div class="tbl"><table><tr><th>Что</th><th>Как</th></tr>
+ <tr><td>Оператор звена</td><td>добавка из матрицы переходов 6 × 6 по оператору прошлого звена; только место или время</td></tr>
+ <tr><td>Якорь звена</td><td>добавка по близости к прошлой цели: скалярное произведение проекций векторов узлов (<code>256 → 256</code>)</td></tr>
+ <tr><td>Масштаб звена</td><td>добавка из матрицы 6 × 3 по оператору звена</td></tr></table></div>
+ <p>Все добавки начинаются с нуля, так что на старте поведение как без декодера. Граф между звеньями не пересобирается: пересборка стоила бы ≈ 3.9 с на эпоху.</p>`},
+
+'net-reg':{t:'Регуляторы',tag:'l',p:'net',lrn:1,s:'Три обучаемых числа, которые не выбирают ходы, а держат обучение в равновесии.',
+ b:`<div class="tbl"><table><tr><th>Параметр</th><th>Что делает</th></tr>
+ <tr><td><code>log_alpha</code></td><td>температура энтропии: растёт, если выбор уже 0.75 по нормированной энтропии, — сеть не сворачивается слишком рано</td></tr>
+ <tr><td><code>log_vars</code> (3)</td><td>баланс вспомогательных целей голов «маршрут / заявка / бригада»: вес exp(−log_var) + log_var</td></tr>
+ <tr><td><code>critic_scale</code></td><td>не обучается: 0.1 — во сколько раз ослаблен градиент ценности в общих слоях</td></tr></table></div>`},
+
+pick:{t:'Выбор хода',tag:'l',p:'epoch',lrn:1,s:'Из выходов сети 64 раза собирается ход: сначала оператор, дальше всё остальное — в порядке, который зависит от оператора.',
+ u:'Режим «равномерный» идёт в том же порядке и по тем же маскам, но каждый выбор равномерный; выбор маршрута и заявки — наполовину пропорционально потенциалу.',
+ kids:['pick-mix','pick-dedup'],
+ b:`<h3>Цель — по оператору</h3><div class="tbl"><table><tr><th>Оператор</th><th>Что выбирается как цель</th></tr>
+ <tr><td>отрезок маршрута</td><td>маршрут → заявка-якорь в нём</td></tr>
+ <tr><td>пара маршрутов</td><td>маршрут → вторая бригада</td></tr>
+ <tr><td>роспуск маршрута</td><td>маршрут</td></tr>
+ <tr><td>соседи по месту / по времени</td><td>заявка-якорь</td></tr>
+ <tr><td>перенос</td><td>заявка → бригада-получатель из допустимых</td></tr></table></div>`},
+
+'pick-mix':{t:'Смесь и маски',tag:'l',p:'pick',lrn:1,s:'Каждый выбор = 0.8 · распределение сети + 0.2 · равномерно по допустимым вариантам.',
+ b:`<p class="m">p = 0.8 · softmax(логиты сети по маске) + 0.2 · равномерно(маска)</p>
+ <ul><li>20% — пол исследования: сеть не может обнулить вариант, каждый иногда выпадает и получает награду.</li>
+ </ul>
+ <h3>Маски</h3><div class="tbl"><table><tr><th>Что</th><th>Когда недоступно</th></tr>
+ <tr><td>отрезок, пара</td><td>нет занятых маршрутов (пара — ещё и одна бригада)</td></tr>
+ <tr><td>перенос</td><td>нет ни одного допустимого переноса</td></tr>
+ <tr><td>роспуск</td><td>занятых маршрутов меньше двух <b>или в родителе есть неназначенные</b>; маршрут с начатой работой распускать нельзя</td></tr>
+ <tr><td>масштаб, вставка, цепочка</td><td>масштаб не выбирается у переноса и роспуска</td></tr></table></div>`},
+
+'pick-dedup':{t:'Без повторов и мёртвая зона',tag:'f',p:'pick',s:'Две защиты от пустой работы внутри эпохи.',
+ b:`<div class="tbl"><table><tr><th>Что</th><th>Правило</th><th>Зачем</th></tr>
+ <tr><td>Без повторов</td><td>ход, уже выбранный в этой эпохе, — перевыбор (до 64 попыток); кандидат-копия родителя — перемутация (до 2 раз)</td><td>без правила до 32 из 64 ходов сети были копиями родителя; с ним — 52 разных</td></tr>
+ <tr><td>Мёртвая зона</td><td>если ни один кандидат эпохи ничем не отличался от родителя, следующая эпоха выбирает равномерно</td><td>без различий нет сигнала для обучения</td></tr></table></div>
+ <div class="note">«Без повторов» включено у сети; у режима «равномерный» оно не нужно — повторы там случайны и редки.</div>`},
+
+move:{t:'Ход: разрушить и вставить',tag:'f',p:'epoch',s:'Ход снимает часть заявок вокруг цели (1–3 раза подряд) и вставляет их обратно одним из 6 способов. Это код, не сеть: сеть только выбирает параметры.',
+ u:'В режиме «равномерный» то же самое: те же операторы и цепочки; вставка — 3 способа (regret-1/2/3) и цена 300 км за новую бригаду.',
+ kids:['move-ops','move-chain','move-repair']},
+
+'move-ops':{t:'Операторы и масштаб',tag:'f',p:'move',s:'Шесть способов разрушить и три масштаба.',
+ b:`<div class="tbl"><table><tr><th>Оператор</th><th>Что снимает</th></tr>
+ <tr><td>отрезок маршрута</td><td>кусок одного маршрута вокруг якоря</td></tr>
+ <tr><td>пара маршрутов</td><td>заявки двух маршрутов — для обмена</td></tr>
+ <tr><td>соседи по месту</td><td>близкие заявки у разных бригад</td></tr>
+ <tr><td>соседи по времени</td><td>заявки с близкими окнами у разных бригад</td></tr>
+ <tr><td>перенос</td><td>одну заявку — к выбранному получателю</td></tr>
+ <tr><td>роспуск маршрута</td><td>весь маршрут: заявки расходятся по остальным, бригада освобождается</td></tr></table></div>
+ <p>Масштаб 0.15 / 0.4 / 0.8 — насколько широко снимаем вокруг цели. На больших задачах мелкий масштаб в разы дешевле и чаще улучшает; у переноса и роспуска масштаба нет.</p>`},
+
+'move-chain':{t:'Цепочка',tag:'f',p:'move',s:'До 3 разрушений подряд, потом одно восстановление.',
+ b:`<p>Добавочные звенья — только «соседи по месту» и «соседи по времени»: внутримаршрутные разрушения в 64–87% случаев возвращают заявки на прежние места, а поперечные создают разброс, ради которого цепочка нужна.</p>`},
+
+'move-repair':{t:'Вставка',tag:'f',p:'move',s:'Снятые заявки вставляются жадно, с сожалением (regret) 1, 2 или 3, в плотном или свободном режиме.',
+ b:`<div class="tbl"><table><tr><th>Режим</th><th>Новая бригада</th></tr>
+ <tr><td>плотная</td><td>только если заявке больше некуда (цена открытия 10⁶)</td></tr>
+ <tr><td>свободная</td><td>открывается без штрафа, если так короче по км</td></tr>
+ <tr><td>режим «равномерный»</td><td>regret-1/2/3 и цена 300 км за новую бригаду</td></tr></table></div>
+ <p>Во всех режимах вставка бережёт аварии: сначала ищет места, где авария не уходит за ориентир, и только потом обычные.</p>`},
+
+select:{t:'Отбор родителя',tag:'f',p:'epoch',s:'Из изменённых кандидатов берётся лучший по кортежу цели. Принять ли его, решает отжиг: ухудшение в главных строках не принимается никогда.',
+ u:'В режиме «равномерный» отбор тот же.',
+ b:`<h3>Правило отжига по кортежу</h3><div class="tbl"><table><tr><th>Кандидат против родителя</th><th>Решение</th></tr>
+ <tr><td>не хуже</td><td>принят</td></tr>
+ <tr><td>хуже в строках 1–5: аварии, подключения, заявки, &gt; 2 ч, бригады</td><td><b>отказ всегда</b></td></tr>
+ <tr><td>хуже только в км или в ожидании</td><td>принят с вероятностью exp(−(Δ / разброс) / τ); разброс — медиана таких отклонений в эпохе; τ = max(0.05, 1 − эпоха / 500)</td></tr></table></div>
+ <p>Лучший из всех 64 кандидатов (не только изменённых) сравнивается с рекордом расчёта и при улучшении его заменяет. Рекорд хранится отдельно: родитель может ухудшаться, рекорд — нет.</p>
+ <div class="note w">Следствие: роспуск, после которого заявки временно остаются неназначенными или бригад не меньше, поиск не примет никогда. Путь «через овраг» по главным строкам закрыт правилом, а не сетью.</div>`},
+
+learn:{t:'Обучение с подкреплением',tag:'l',p:'epoch',lrn:1,s:'После каждой эпохи — один шаг градиента политики на 64 кандидатах. Действие — ход, награда — насколько кандидат лучше родителя по цели. Награда приходит сразу, в той же эпохе: это одношаговая постановка RL («контекстный бандит»).',
+ u:'В режиме «равномерный» обучения нет: награды не считаются, ходы не запоминаются.',
+ kids:['learn-reward','learn-adv','learn-loss','learn-step']},
+
+'learn-reward':{t:'Награда-ступенька',tag:'f',p:'learn',s:'Кандидат сравнивается с родителем по первой отличающейся строке кортежа. Чем важнее строка, тем выше ступенька.',
+ b:`<div class="tbl"><table><tr><th>Первая отличающаяся строка</th><th class="n">Награда (± по знаку)</th></tr>
+ <tr><td>аварии</td><td class="n">7/7 = 1</td></tr><tr><td>подключения</td><td class="n">6/7</td></tr><tr><td>заявки</td><td class="n">5/7</td></tr>
+ <tr><td>&gt; 2 ч</td><td class="n">4/7</td></tr><tr><td>бригады</td><td class="n">3/7</td></tr>
+ <tr><td>км</td><td class="n">(1 + tanh(Δ / масштаб)) / 7, до ≈ 2/7</td></tr>
+ <tr><td>ожидание</td><td class="n">tanh(Δ / масштаб) / 7</td></tr>
+ <tr><td>не отличается</td><td class="n">0</td></tr></table></div>
+ <div class="note w">Награда одношаговая: роспуск маршрута, который окупится через несколько эпох, сразу получает минус. Поэтому сеть осторожна с роспуском — и поэтому в плане дня вместе с сетью работает режим «равномерный».</div>`},
+
+'learn-adv':{t:'Преимущество в эпохе',tag:'f',p:'learn',s:'Награды 64 кандидатов нормируются внутри эпохи: среднее 0, разброс 1.',
+ b:`<ul><li>Вес пачки: каждый уникальный ход получает равную массу; одинаковые ходы делят её между собой, одинаковые планы обязаны получать одинаковую награду.</li>
+ <li>Преимущество = (награда − среднее) / разброс по взвешенной пачке.</li>
+ <li>Базовая линия — средняя награда эпохи: кандидаты сравниваются между собой; ценность V в расчёт не входит.</li></ul>`},
+
+'learn-loss':{t:'Потери',tag:'l',p:'learn',lrn:1,s:'Четыре слагаемых, одним обратным проходом.',
+ b:`<div class="tbl"><table><tr><th>Слагаемое</th><th>Формула</th><th>Смысл</th></tr>
+ <tr><td>Актор</td><td class="m">−Σ w · log π(ход) · A</td><td>log π — по <b>всем</b> выборам хода: оператор, вставка, масштаб, цель, цепочка (полный кредит)</td></tr>
+ <tr><td>Энтропия</td><td class="m">−α · H</td><td>H — энтропия самой схлопнутой головы, где было из чего выбирать; α подстраивается к цели 0.75</td></tr>
+ <tr><td>Цели голов</td><td class="m">KL(π_цели ‖ softmax(ср. награда / 0.25))</td><td>для маршрута, заявки, бригады — по каждому оператору: какие цели в эту эпоху дали лучшую награду</td></tr>
+ <tr><td>Критик</td><td class="m">0.5 · (V − ср. награда эпохи)²</td><td>голова ценности учится попутно; в преимущество не входит</td></tr></table></div>`},
+
+'learn-step':{t:'Шаг обучения',tag:'l',p:'learn',lrn:1,s:'Обрезка градиента по группам, затем Adam с шагом 0.001.',
+ b:`<ul><li>Нечисловой градиент останавливает расчёт с ошибкой, а не портит веса молча.</li>
+ <li>Сеть — одноразовая: живёт один расчёт и выбрасывается. Заранее обученных весов нет.</li></ul>`},
+
+limits:{t:'Что ограничивает сеть',tag:'f',p:'epoch',s:'Честный список: где сеть сейчас упирается и что мы с этим сделали.',
+ b:`<div class="tbl"><table><tr><th>Ограничение</th><th>Где</th><th>Что сделано</th></tr>
+ <tr><td>Награда одношаговая: роспуск маршрута сразу выглядит невыгодным</td><td><a href="#learn-reward">награда</a></td><td>в плане дня вместе с сетью работает режим «равномерный»: он распускает маршруты чаще, и смесь не зависит от одной траектории</td></tr>
+ <tr><td>Ухудшение в главных строках цели не принимается</td><td><a href="#select">отбор</a></td><td>сознательно: путь через временно неназначенные заявки закрыт, зато план никогда не жертвует аварией ради километров</td></tr>
+ <tr><td>Внимание усредняет соседей</td><td><a href="#net-mp">обмен сообщениями</a></td><td>суммы и совместную вместимость сеть сама не собирает — потенциал подан ей готовым признаком</td></tr>
+ <tr><td>Свёртка — только среднее</td><td><a href="#net-pool">свёртка</a></td><td>перекос нагрузки между маршрутами голове оператора не виден; вариант с разбросом и максимумом есть в коде</td></tr>
+ <tr><td>К концу расчёта находок становится мало</td><td><a href="#learn">обучение</a></td><td>на коротких бюджетах сеть и равномерный режим идут на равных; на больших задачах при 90 с и дольше сеть сильнее</td></tr></table></div>`}
+};
+
+const ORDER = ['epoch'];
+(function walk(id){ (N[id].kids||[]).forEach(k => { ORDER.push(k); walk(k); }); })('epoch');
+
+function path(id){ const out=[]; for(let x=id; x; x=N[x].p) out.unshift(x); return out; }
+
+function buildTree(){
+  const mk = id => { const n=N[id];
+    const kids = (n.kids||[]).map(mk).join('');
+    return `<li><a href="#${id}" data-id="${id}" class="${n.lrn?'lrn':''}">${n.t}</a>${kids?`<ul>${kids}</ul>`:''}</li>`; };
+  document.getElementById('tree').innerHTML = mk('epoch');
+}
+
+const tagName = {l:'учится', f:'движок поиска'};
+function render(id){
+  if(!N[id]) id='epoch';
+  const n=N[id];
+  const crumbs = path(id).map((x,i,a)=> i<a.length-1 ? `<a href="#${x}">${N[x].t}</a> ›` : `<span>${N[x].t}</span>`).join(' ');
+  const fig = FIG[id] ? `<figure><div class="scroll">${FIG[id]}</div><figcaption>${n.cap || 'Блоки со стрелкой-ссылкой раскрываются: щёлкните по ним или выберите в списке ниже.'}</figcaption></figure>` : '';
+  const kids = (n.kids||[]).length ? `<h3>Внутри</h3><div class="kids">${n.kids.map(k=>`<button type="button" class="kid ${N[k].lrn?'lrn':''}" data-go="${k}"><b>${N[k].t}</b><span>${N[k].s.split('. ')[0].replace(/\.$/,'')}.</span></button>`).join('')}</div>` : '';
+  document.getElementById('view').innerHTML =
+    `<nav class="crumbs" aria-label="Где вы">${crumbs}</nav>
+     <h2>${n.t}<span class="tag ${n.tag}">${tagName[n.tag]}</span></h2>
+     <p class="lead">${n.s}</p>
+     ${n.u?`<div class="unote"><b>Режим «равномерный».</b> ${n.u}</div>`:(n.lrn?`<div class="unote"><b>Режим «равномерный».</b> Этого блока в нём нет.</div>`:'')}
+     ${fig}${kids}<div class="body">${n.b||''}</div>`;
+  document.querySelectorAll('#tree a').forEach(a=>a.classList.toggle('on', a.dataset.id===id));
+  document.querySelectorAll('#view [data-go]').forEach(el=>{
+    const go=()=>{ location.hash = el.dataset.go; };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
+  });
+}
+
+function setMode(u){
+  document.body.classList.toggle('u', u);
+  document.getElementById('m-b').setAttribute('aria-pressed', String(!u));
+  document.getElementById('m-u').setAttribute('aria-pressed', String(u));
+  try{ localStorage.setItem('netmap-mode', u?'u':'b'); }catch(e){}
+}
+document.getElementById('m-b').addEventListener('click', ()=>setMode(false));
+document.getElementById('m-u').addEventListener('click', ()=>setMode(true));
+try{ if(localStorage.getItem('netmap-mode')==='u') setMode(true); }catch(e){}
+
+buildTree();
+const current = () => (location.hash||'').slice(1) || 'epoch';
+window.addEventListener('hashchange', ()=>{ render(current()); document.getElementById('view').scrollIntoView({block:'start', behavior:'auto'}); });
+render(current());
+</script>
+</body>
+</html>

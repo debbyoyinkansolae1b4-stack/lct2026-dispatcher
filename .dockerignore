@@ -1,0 +1,20 @@
+# В образ — только приложение и данные, которые оно читает (см. Dockerfile).
+*
+!Dockerfile
+!app.py
+!run.py
+!docs/DOCUMENTATION.html
+!docs/ENGINE.html
+!requirements.txt
+!src/
+!web/
+!config/
+!data/raw/obezlichivanie/
+!data/interim/travel_*.json
+!data/interim/geometry.json
+!data/interim/geocode.json
+!data/traffic/
+!data/samples/
+**/__pycache__
+config/datasets.json
+src/alt/

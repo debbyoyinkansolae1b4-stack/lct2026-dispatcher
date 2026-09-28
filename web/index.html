@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Планировщик выездных инженеров · Билайн Бизнес</title>
+<link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
+<link rel="stylesheet" href="/static/style.css?v=__V__">
+</head>
+<body>
+<header>
+  <div class="brand">Помощник диспетчера <span>ЛЦТ2026 · задача 3</span></div>
+  <div class="controls">
+    <select id="region"></select>
+    <select id="mode">
+      <option value="converge">считать до сходимости</option>
+      <option value="time">считать заданное время</option>
+    </select>
+    <label>не дольше <input id="seconds" type="number" value="20" min="2" max="120" step="1"> c</label>
+    <button id="plan" class="primary">Построить план</button>
+    <label class="ortools-toggle" title="Особый режим с упрощёнными рамками: сравнение с OR-Tools, не рабочий план">
+      <input type="checkbox" id="ortools"> сверка с OR-Tools</label>
+    <a href="/admin" title="Справочники и настройки алгоритма"><button>Администрирование</button></a>
+  </div>
+</header>
+
+<main>
+  <aside id="side">
+    <div id="dataset" class="block"></div>
+    <div id="check" class="block check-block"></div>
+    <div id="metrics" class="cards"></div>
+    <div id="urgentWait" class="block"></div>
+    <div id="validation" class="block"></div>
+    <div id="compare" class="block"></div>
+    <div id="bounds" class="block"></div>
+    <div id="advice" class="block"></div>
+    <div class="block">
+      <h3>Событие в течение дня</h3>
+      <div class="event-row">
+        <select id="eventKind">
+          <option value="urgent">срочная авария</option>
+          <option value="assign">ручное переназначение</option>
+          <option value="complete">подтвердить завершение</option>
+          <option value="cancel">отмена заявки</option>
+          <option value="engineer_off">инженер недоступен</option>
+        </select>
+        <input id="eventAt" type="time" value="13:00" step="900" lang="ru-RU">
+      </div>
+      <div class="event-row"><select id="eventTarget"></select></div>
+      <div class="event-row" id="assignRow" style="display:none"><label for="assignEngineer">Исполнитель</label><select id="assignEngineer"></select></div>
+      <div class="event-row" id="addressRow">
+        <input id="eventAddress" placeholder="адрес аварии, например: Окская 32" style="flex:1">
+        <button id="findAddress">Найти</button>
+      </div>
+      <div id="eventHint" class="hint">Введите адрес или кликните точку на карте, затем «Перестроить».</div>
+      <label class="event-row hint" id="reserveRow" title="По умолчанию перестройка использует только бригады, которые сегодня вышли на линию (у них есть заявки в плане). Вызов с выходного — отдельная эскалация.">
+        <input type="checkbox" id="eventReserve"> вызвать бригаду с выходного, если работающих не хватает</label>
+      <button id="apply">Перестроить план</button>
+    </div>
+    <div id="diff" class="block hidden"></div>
+    <div id="routes" class="block"></div>
+    <div id="unassigned" class="block"></div>
+  </aside>
+
+  <section id="mapwrap">
+    <div id="map"></div>
+    <div id="modeBanner" class="mode-banner hidden"></div>
+    <div id="detail" class="detail hidden"></div>
+    <div id="status" class="status">Загружаем данные дня…</div>
+    <div id="legend" class="legend hidden"></div>
+  </section>
+</main>
+
+<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="/static/app.js?v=__V__"></script>
+<script src="/static/tour-content.js?v=__V__"></script>
+<script src="/static/tour.js?v=__V__"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+.DS_Store
+.ipynb_checkpoints/
+*.pyc
+.vscode/
+.idea/
+
+# Медиа и большие исходники: лежат локально, ссылки в source/links.md
+*.m4a
+*.mp3
+*.mp4
+*.wav
+*.osm.pbf
+cookies.txt
+
+# Тяжёлые производные данные: пересобираются скриптами
+data/interim/local_addresses.sqlite
+data/interim/*.pbf
+/artifacts/screens/
+
+# Кэши, наоборот, в репозитории: без них первый запуск требует сети,
+# а демонстрация должна работать офлайн
+!data/interim/geocode.json
+!data/interim/travel_*.json
+
+# Артефакты замеров: веса, сырые логи и кандидаты. Пересоздаются прогоном, весят
+# десятки гигабайт (один checkpoint 117 МБ: 39 веса + 78 состояние Adam), в истории
+# им делать нечего. В репозитории остаются .md (интерпретации) и небольшие .json
+# со сводками; уже отслеживаемые файлы эти правила не затрагивают.
+/artifacts/*.pt
+/artifacts/*.jsonl
+/artifacts/*.log
+/artifacts/*.pkl
+
+# Исключения: замороженный вход замеров и эталон подсказок нужны тестам и
+# воспроизведению, поэтому остаются в репозитории явно.
+!/artifacts/ortools_static_equivalence_v*.pkl
+!/artifacts/hints_golden_v1.json
+!/artifacts/policy.pt
+
+# Поэпохные логи прогонов: 793 файла на 1.3 ГБ, 97% объёма артефактов. Воспроизводимы
+# прогоном с тем же сидом (граница по эпохам, конструктор детерминирован), а разбор
+# идёт по ним с диска, гит для этого не нужен.
+/artifacts/*_t[0-9]*.json
+/artifacts/*_results.json
+
+# Сводки сравнений и условия замеров остаются: без них прежние выводы не перечитать.
+!/artifacts/*_rows.json
+!/artifacts/*_manifest.json
+!/artifacts/*conclusion*.json
+
+# Временные зонды и прогревочные прогоны: нужны были в момент правки, как запись
+# не ценны — условия в них не зафиксированы и повторить их никто не станет.
+/artifacts/probe_*
+/artifacts/speed_*
+/artifacts/timing_*
+/artifacts/*_warmup.*
+/artifacts/*_smoke_*
+/artifacts/ab_smoke*
+
+# Добавленное в приложении (вкладка «Данные»): реестр наборов, загруженные наборы и файлы пробок —
+# состояние, не код. Демонстрационные слои data/traffic/*.json (scripts/build_traffic_layers.py) — в репозитории.
+/config/datasets.json
+data/uploads/
+data/traffic/uploads/

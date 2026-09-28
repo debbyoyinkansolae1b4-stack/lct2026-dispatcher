@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Администрирование · Помощник диспетчера</title>
+<link rel="stylesheet" href="/static/style.css?v=__V__">
+<style>
+  main.admin { display: block; max-width: 1080px; margin: 0 auto; padding: 18px; height: auto; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  table.norm { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.norm td { padding: 3px 0; border-bottom: 1px solid var(--line); }
+  table.norm td.n, table.norm th.n { text-align: right; width: 92px; }
+  table.norm th { font-weight: 500; text-align: left; padding: 3px 0; color: var(--muted, #666); }
+  table.norm input { width: 76px; text-align: right; padding: 3px 6px; }
+  .kv { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px;
+        border-bottom: 1px solid var(--line); gap: 12px; }
+  .kv:last-child { border-bottom: 0; }
+  .kv span:last-child { color: var(--dim); text-align: right; }
+  .bar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  /* Пробки по часам: столбик — коэффициент на машине, усик — разброс 10–90% между парами точек (слои), фон — часы смен */
+  .tchart { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 120px; align-items: end;
+            margin-top: 10px; position: relative; }
+  .tchart .h { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; border-radius: 3px; }
+  .tchart .h.shift { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .tchart .h i { display: block; width: 70%; background: var(--accent); border-radius: 4px 4px 0 0; }
+  .tchart .h b { position: absolute; left: 50%; width: 2px; margin-left: -1px; background: var(--ink); opacity: .45; }
+  .tchart .one { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--dim); pointer-events: none; }
+  .taxis { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; font-size: 11px; color: var(--dim); text-align: center; }
+  .saved { color: var(--ok); font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 12px; }
+  .tabs button.active { border-bottom-color: var(--accent); font-weight: 600; }
+  [hidden] { display: none !important; }
+  .panel { display: none; }
+  .tip { cursor: help; }
+  /* «Цель»: порядок строк слева, настройки справа (перенос 26.09 — без весов поиска) */
+  .goalgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 12px; align-items: start; }
+  .goalgrid > .block { max-width: none; }
+  .grow { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 1px 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .grow:last-child { border-bottom: 0; }
+  .grow .gnum { color: var(--dim); font-size: 13px; }
+  .grow .gdir { grid-column: 2; color: var(--dim); font-size: 13px; }
+  .grow .gform { grid-column: 2; color: var(--dim); font-size: 13px; }
+  .grow.gcost { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 6px; padding: 8px 6px; border-bottom: 0; margin: 3px -6px; }
+  .grow.off > span { color: var(--dim); }
+  .gset { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .gset:last-child { border-bottom: 0; }
+  .gtitle { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .gref { font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
+  .ginline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+  .ginline input[type=number] { width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
+  .gwide { width: 100%; margin-bottom: 4px; }
+  @media (max-width: 860px) { .goalgrid { grid-template-columns: 1fr; } }
+  .tabbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .tabbar .tabs { flex: 1; }
+  .tabs button.changed::after { content: " •"; color: var(--warn); }
+  .resetbar { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; }
+  .resetbar .hint { margin: 0; }
+  .linklike { border: 0; background: none; color: var(--dim); text-decoration: underline; cursor: pointer; padding: 4px; }
+  .linklike:disabled { opacity: .45; cursor: default; }
+  .panel.active { display: block; }
+  .panel > .block { max-width: 760px; }
+  .panel[data-panel=data] > .block { max-width: none; }
+  #progressChart { position: relative; }
+  .pc { width: 100%; height: auto; display: block; }
+  .pc-title { font-size: 12px; color: var(--dim); margin: 8px 0 0; }
+  .pc-grid { stroke: var(--line); stroke-width: 1; }
+  .pc-axis { font-size: 11px; fill: var(--dim); }
+  .pc-cross { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 3 3; }
+  .pc-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; margin: 6px 0 2px; }
+  .pc-legend i, .pc-tip i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .pc-tip { position: absolute; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); pointer-events: none; width: 250px; }
+  .nd-step { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 0 6px; }
+  .nd-file { border-left: 3px solid var(--line); padding-left: 12px; margin: 4px 0 8px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Администрирование <span>справочники и алгоритм</span></div>
+  <div class="controls"><a href="/"><button>К плану диспетчера</button></a></div>
+</header>
+
+<main class="admin">
+  <div id="adminErrors" class="block delta-bad hidden"></div>
+  <div class="tabbar"><nav class="tabs" id="tabs"><button data-tab="data">Данные</button><button data-tab="goal">Цель</button><button data-tab="norms">Нормативы и допущения</button><button data-tab="search">Поиск</button><button data-tab="analysis">Анализ</button></nav>
+    <div class="resetbar"><span id="resetNote" class="hint"></span>
+      <button id="resetTab" title="Вернуть заводские настройки этой вкладки">Сбросить вкладку</button>
+      <button id="resetAll" class="linklike" title="Вернуть заводские настройки всех вкладок">сбросить всё</button></div></div>
+  <section class="panel" data-panel="data">
+    <div class="block">
+      <h3>Наборы данных</h3>
+      <div class="hint">Встроенные участки — синтетические файлы организаторов; бригады восстановлены по контрольному
+        дню (допущение команды). Добавленные наборы — варианты с другими бригадами и загруженные файлы заявок.
+        Выбрать набор для плана — на главной, в списке рядом с кнопкой «Построить план».</div>
+      <table class="norm"><thead><tr><th>Набор</th><th>Бригады</th><th class="n">Добавлен</th><th></th></tr></thead>
+        <tbody id="datasetList"></tbody></table>
+      <div id="datasetSaved" class="hint"></div>
+    </div>
+    <div class="block">
+      <h3>Новый набор</h3>
+      <div class="hint">Набор — это заявки дня и бригады. <b>Заявки</b> берутся как есть: из встроенного набора или из вашего
+        файла. <b>Бригады</b> создаются по параметрам ниже: сколько всего и у скольких какой навык (у одной бригады их может
+        быть несколько); вид транспорта раздаётся по долям из «Нормативов и допущений». Сид — номер случайной выборки: с тем
+        же сидом получаются те же бригады. Пример вопроса: «что даст ещё одна бригада с аварийным допуском?».</div>
+      <div class="nd-step" id="ndSourceRow"><b>1. Заявки</b>
+        <label><input type="radio" name="ndSource" value="base" checked> из набора <select id="genBase"></select></label>
+        <label><input type="radio" name="ndSource" value="file"> из файла</label></div>
+      <div id="ndFile" class="nd-file hidden">
+        <div class="hint">CSV в формате организаторов (точка с запятой, cp1251) или близком: UTF-8, запятая или табуляция;
+          координаты — колонками lat/lon, иначе адрес ищется в справочнике и геокодером. Строки, которые не удалось
+          разобрать, пропускаются с причиной в отчёте. Один файл — один участок.</div>
+        <div class="row"><input id="upFile" type="file" accept=".csv,.txt,text/csv">
+          <button id="useSample" title="Готовый файл: половина заявок дня Востока с координатами">Взять пример</button>
+          <a href="/api/datasets/sample" download>скачать пример</a></div>
+        <div id="sampleNote" class="hint"></div>
+        <div class="row"><label style="flex:1">офис, если его нет в файле <input id="upOffice"
+          placeholder="адрес или «широта, долгота»" style="width:100%"></label></div>
+      </div>
+      <div class="nd-step"><b>2. Бригады</b></div>
+      <div id="genForm"></div>
+      <div class="nd-step"><b>3. Название</b>
+        <input id="genTitle" placeholder="по умолчанию — из параметров" style="flex:1"></div>
+      <div class="row"><button id="genCreate" class="primary">Создать набор</button><span id="genSaved"></span></div>
+      <div id="upReport"></div>
+    </div>
+    <div class="block">
+        <h3>Пробки: источник времени в пути</h3>
+        <div class="row">
+          <select id="trafficRegion"></select>
+          <select id="trafficSource"></select>
+        </div>
+        <div class="row">
+          <select id="trafficFile" style="flex:1"></select>
+          <input id="trafficUpload" type="file" accept=".json,application/json" style="flex:1">
+          <a id="trafficSample" download title="Слои для точек этого набора в формате загрузки: замените матрицы своими и загрузите">скачать пример</a>
+          <button id="applyTraffic" class="primary">Применить</button>
+        </div>
+        <div id="trafficState" class="hint"></div>
+        <div id="trafficNote" class="hint"></div>
+        <div id="trafficChart"></div>
+      </div>
+  </section>
+  <section class="panel" data-panel="goal">
+    <div class="goalgrid">
+      <div class="block">
+        <h3>Какой план лучше</h3>
+        <div class="hint">Решает первая строка, где планы различаются: следующая строка важна, только если все выше равны.
+          Так планы сравнивают и поиск, и итог — без весов.</div>
+        <div id="goalRows"></div>
+      </div>
+      <div class="block">
+        <h3>Настройки цели</h3>
+        <div class="hint">Номера связывают настройки со строками слева.</div>
+        <div class="gset">
+          <div class="gtitle"><span class="gref">4</span><label><input id="goalLate" type="checkbox"> Учитывать долгое ожидание аварий</label></div>
+          <div class="ginline"><label for="goalLimit">Дольше</label><input id="goalLimit" type="number" min="0" step="10"><span>минут до начала работ</span></div>
+          <div class="hint">Включено: ради аварии, которая иначе ждёт дольше ориентира, можно вывести ещё бригаду. Ориентир экспертов —
+            реакция 1–2 ч; ожидание считаем до начала работ.</div>
+        </div>
+        <div class="gset">
+          <div class="gtitle"><span class="gref">6</span><label for="goalMode">Цена ожидания аварий</label></div>
+          <select id="goalMode" class="gwide"><option value="square">Квадратом — долгие ожидания дороже</option>
+            <option value="linear">Линейно — каждая минута одинаково</option></select>
+          <div class="ginline"><label for="goalPrice">Цена</label><input id="goalPrice" type="number" min="0" step="0.00001"><span id="goalUnit"></span></div>
+          <div class="hint" id="goalExamples"></div>
+        </div>
+        <div class="gset">
+          <div class="gtitle"><span class="gref">6</span><label><input id="goalMoves" type="checkbox"> Цена переназначения после события</label></div>
+          <div class="ginline"><label for="goalMovePrice">Цена</label><input id="goalMovePrice" type="number" min="0" step="1"><span>км за каждую заявку, сменившую бригаду</span></div>
+          <div class="hint">Включено: при перестройке после события план меньше «скачет» (замер 23.09: перестановок в 1.5–6 раз меньше).
+            Рекомендуемое значение — 5 км.</div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button id="saveWeights" class="primary">Сохранить цель</button>
+      <span id="weightsSaved"></span>
+    </div>
+    <div class="hint">Как поиск идёт к этой цели — вкладка «Поиск».</div>
+  </section>
+  <section class="panel" data-panel="norms">
+    <div class="grid">
+    <div class="block">
+      <h3>Нормативы длительности, минут</h3>
+      <div class="hint" id="normNote"></div>
+      <table class="norm">
+        <thead><tr><th>Работа</th><th class="n">Техническая</th><th class="n">Документы</th>
+          <th class="n">На адресе</th><th class="n">Норматив</th></tr></thead>
+        <tbody id="normTable"></tbody>
+      </table>
+      <div class="hint" id="normReserve"></div>
+      <div class="row">
+        <button id="saveNorm" class="primary">Сохранить нормативы</button>
+        <span id="normSaved"></span>
+      </div>
+      <div class="hint">Официальная таблица организаторов. Класс работы определяется
+        по типу заявки BK, срочная заявка всегда считается аварией.</div>
+    </div>
+    <div>
+      <div class="block">
+        <h3>Допущения по исполнителям</h3>
+        <div class="row">
+          <label>навыки бригад
+            <select id="skillsMode">
+              <option value="history">из истории: что делали, то и умеют</option>
+              <option value="universal">универсальные: все умеют всё</option>
+            </select>
+          </label>
+        </div>
+        <div class="hint" id="skillsNote"></div>
+        <div class="row">
+          <label>смена с <input id="shiftStart" type="time" step="900"></label>
+          <label>до <input id="shiftEnd" type="time" step="900"></label>
+        </div>
+        <div id="mix" style="margin-top:10px"></div>
+        <div class="row">
+          <button id="saveAsm" class="primary">Сохранить допущения</button>
+          <span id="asmSaved"></span>
+        </div>
+      </div>
+      <div class="block">
+        <h3>Прочие допущения</h3>
+        <div id="misc"></div>
+        <div class="hint" id="miscNote"></div>
+      </div>
+    </div>
+  </div>
+  </section>
+  <section class="panel" data-panel="search">
+    <div class="block">
+        <h3>Параллельные поиски</h3>
+        <div class="hint">Несколько независимых поисков считают одновременно, в ответ идёт лучший план. Оба режима — одна
+          машина поиска (разрушить часть плана и вставить заново, 64 варианта плана за цикл, отбор по порядку строк цели):
+          «сеть» — одноразовая графовая сеть, учится на этой же задаче выбирать, где и как менять план;
+          «равномерный» — ходы без сети, поровну, а место изменения — частью по потенциалу (где перенос заявки выгоден): это знание
+          переняли у сети. По умолчанию — две сети и два равномерных. Каждый поиск занимает ядро на всё время расчёта и около
+          0.6 ГБ памяти (равномерный) или 0.8 ГБ (сеть); состав, которому нужно больше 70% памяти машины, не запустится.
+          Настройки действуют со следующего расчёта.</div>
+
+        <div class="row"><label><input id="urgentFront" type="checkbox"> постобработка «аварии вперёд»</label></div>
+        <div class="hint">После поиска авария пробует встать первой в маршрут своей или другой работающей бригады с
+          аварийным допуском; ход принимается, только если цель от этого строго лучше, так что план не хуже найденного.
+          Новых бригад не открывает, заявок не снимает, длится не дольше секунды. Действует на план дня, перестройку после
+          события и «что если».</div>
+        <div class="row"><label>процессов одновременно <input id="searchWorkers" type="number" min="1" step="1" style="width:60px"></label>
+          <span class="hint" id="searchCores"></span></div>
+        <h4 style="margin:12px 0 4px">План на день</h4>
+        <div class="row">
+          <label>остановка <select id="searchStop">
+            <option value="time">до указанного времени</option>
+            <option value="patience">после N циклов без улучшения</option></select></label>
+          <label>N <input id="searchPatience" type="number" min="1" step="1" style="width:60px"></label>
+        </div>
+        <table class="norm"><thead><tr><th>Поиск</th><th>Режим</th><th class="n" title="номер случайной последовательности: один и тот же сид даёт тот же ход расчёта">Сид</th><th></th><th></th></tr></thead>
+          <tbody id="planMembers"></tbody></table>
+        <div class="row"><button id="addPlanMember">Добавить поиск</button></div>
+        <h4 style="margin:12px 0 4px">Перепланирование после события</h4>
+        <div class="row"><label>время <input id="eventSeconds" type="number" min="1" max="60" step="1" style="width:60px"> c</label></div>
+        <table class="norm"><thead><tr><th>Поиск</th><th>Режим</th><th class="n" title="номер случайной последовательности: один и тот же сид даёт тот же ход расчёта">Сид</th><th></th><th></th></tr></thead>
+          <tbody id="eventMembers"></tbody></table>
+        <div class="row"><button id="addEventMember">Добавить поиск</button></div>
+        <div class="row">
+          <button id="saveSearch" class="primary">Сохранить настройки поиска</button>
+          <span id="searchSaved"></span>
+        </div>
+        <div class="hint" id="searchNote"></div>
+      </div>
+  </section>
+  <section class="panel" data-panel="analysis">
+    <div class="block">
+      <h3>Сводка по набору</h3>
+      <div class="row">
+        <select id="sumRegion"></select>
+        <button id="loadSummary">Показать</button>
+      </div>
+      <div class="hint">До всякого поиска: сколько работы на каждый навык и что достижимо для аварий по
+        реальному времени в пути. Считается за секунды.</div>
+      <div id="summary"></div>
+    </div>
+    <div class="block">
+        <h3>Что если изменить допущение</h3>
+        <div class="row">
+          <select id="whatifRegion"></select>
+          <label><input type="checkbox" id="whatifFull"> как на главной</label>
+          <button id="runWhatif">Посчитать</button>
+        </div>
+        <div class="hint" id="whatifNote"></div>
+        <div id="whatif"></div>
+      </div>
+    <div class="block">
+        <h3>Последний расчёт</h3>
+        <div class="row">
+          <select id="statRegion"></select>
+          <button id="loadStats">Показать</button>
+        </div>
+        <div id="stats"></div>
+      </div>
+  </section>
+</main>
+
+<script src="/static/admin.js?v=__V__"></script>
+<script src="/static/tour-content.js?v=__V__"></script>
+<script src="/static/tour.js?v=__V__"></script>
+</body>
+</html>
